@@ -1,0 +1,12 @@
+Il client non deve conservare il file originale.
+
+Il file memorizzato avrà lo stesso nome del file originario ma con estensione .scr
+
+    "fileEx.txt"   ->   "fileEx.txt.sc"
+    
+nel file ci sono memorizzate soltanto le informazioni per la ricostruzione:
+  -  Il primo utilizzato per lo schema
+  -  Il numero di server necessari per la ricostruzione
+  -  la lista ordinata di server di memorizzazione
+  -  La lista ordinata di nomi delle infirmazioni parziai memorizzate su ogni server
+  -  hash del file originale
