@@ -46,6 +46,9 @@ public class SecretSharing {
 		if(s == null) 
 			throw new SecretSharingException("Segreto non impostato!");
 		
+		if(this.modLength < BigInteger.valueOf(n).bitLength())
+			this.modLength = BigInteger.valueOf(n).bitLength();
+		
 		if(!partialInformations.isEmpty())
 			partialInformations.clear();
 
@@ -73,6 +76,10 @@ public class SecretSharing {
 			throw new SecretSharingException("Segreto non impostato!");
 		if(s.compareTo(p) >= 0)
 			throw new SecretSharingException("Il primo p non è più grande del segreto s!");
+		if(BigInteger.valueOf(n).compareTo(p) >= 0)
+			throw new SecretSharingException("Il primo p non è più grande di n!");
+		if(!p.isProbablePrime(this.CERTAINTY))
+			throw new SecretSharingException("p non è primo!");
 		
 		if(!partialInformations.isEmpty())
 			partialInformations.clear();
@@ -104,7 +111,7 @@ public class SecretSharing {
 		for(int i = 1; i <= n; i++) {
 			partialInfo_i = this.s;
 			for(int j = 1; j < k; j++) {
-				partialInfo_i = partialInfo_i.add(coeffs[j-1].multiply(BigInteger.valueOf((int)Math.pow(i, j))));
+				partialInfo_i = partialInfo_i.add(coeffs[j-1].multiply(BigInteger.valueOf(i).pow(j)));
 			}	
 			partialInfo_i = partialInfo_i.mod(p);
 			partialInformations.add(new Entrant(Integer.toString(i), partialInfo_i));

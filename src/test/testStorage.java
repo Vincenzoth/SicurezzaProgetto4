@@ -12,8 +12,9 @@ import progetto4.SecureDistributedStorage;
 
 public class testStorage {
 	final static String BASE_PATH = Paths.get(System.getProperty("user.dir")).toString();
-	final static String FILE_EX_PATH = BASE_PATH + "/data/fileEx";
-	final static String FILE_CLIENT_PATH = BASE_PATH + "/data/client/fileEx.sc";
+	final static String FILE_TO_TEST = "test.pdf";
+	final static String FILE_EX_PATH = BASE_PATH + "/data/" + FILE_TO_TEST;
+	final static String FILE_CLIENT_PATH = BASE_PATH + "/data/client/" + FILE_TO_TEST + ".sc";
 	
 	public static void main(String[] args) {
 		SecureDistributedStorage secStor = new SecureDistributedStorage();
@@ -26,7 +27,7 @@ public class testStorage {
 		serverList.add("server4");
 		serverList.add("server5");
 		
-		/*
+/*
 		try {
 			secStor.store(file, 3, 5, serverList);
 		} catch (IOException | SecretSharingException | NoSuchAlgorithmException e) {

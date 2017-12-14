@@ -9,6 +9,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.RandomAccessFile;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -21,10 +22,10 @@ import java.util.Locale;
 
 public class SecureDistributedStorage {
 	public static final String BASE_PATH = Paths.get(System.getProperty("user.dir")).toString();
-	public static final String FILE_EX_PATH = BASE_PATH + "/data/fileEx";
-	public static final String SERVERS_PATH = BASE_PATH + "/data/servers/";
-	public static final String CLIENT_PATH = BASE_PATH + "/data/client/";
-	public static final String CLIENT_PATH_REC_FILE = BASE_PATH + "/data/client/recFiles/";
+	public static final String FILE_EX_PATH = BASE_PATH + File.separator + "data" + File.separator+ "fileEx";
+	public static final String SERVERS_PATH = BASE_PATH + File.separator + "data" + File.separator + "servers" + File.separator;
+	public static final String CLIENT_PATH = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator;
+	public static final String CLIENT_PATH_REC_FILE = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator + "recFiles" + File.separator;
 
 	public static final int LEN_BLOCK = 300;
 	public static final int RANDOM_NAMEFILE_LEN = 15;
@@ -44,7 +45,7 @@ public class SecureDistributedStorage {
 		if(!testPath.exists())		 
 			testPath.mkdirs();
 
-		testPath = new File(CLIENT_PATH);
+		testPath = new File(CLIENT_PATH_REC_FILE);
 		if(!testPath.exists())		 
 			testPath.mkdirs();
 	}
@@ -179,7 +180,8 @@ public class SecureDistributedStorage {
 
 		getPartialInformationFiles(k, serverList, filesList, partialInfoFiles, idsEntrance);
 
-		obtainOriginalFile(idsEntrance, partialInfoFiles);
+		secShar.setPrime(prime);
+		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles);
 
 		//secShar.computeSecret(partialInformations)
 
@@ -202,7 +204,6 @@ public class SecureDistributedStorage {
 			out.write(byteSecret);
 			out.flush();
 
-			System.out.println("    len inf: " + byteSecret.length + "    Store to: " + serverList.get(i));
 			i++;
 		}
 		out.close();
@@ -313,12 +314,59 @@ public class SecureDistributedStorage {
 
 	}
 
-	private void obtainOriginalFile(String[] idsEntrance, File[] partialInfoFiles) {
-		//CLIENT_PATH_REC_FILE
-		
+	private void obtainOriginalFile(String resultFileName, String[] idsEntrance, File[] partialInfoFiles) throws IOException {
 		ArrayList<Entrant> informations = new ArrayList<Entrant>();
-		InputStream ios = null;
+		File secretFile = new File(CLIENT_PATH_REC_FILE + resultFileName +"a");
+		if(secretFile.exists())
+			secretFile.delete();
+		File firstFile = partialInfoFiles[0];
+		RandomAccessFile  raf;
+		InputStream ios =  new FileInputStream(firstFile); // primo file della lista
 
+		FileOutputStream fos = new FileOutputStream(secretFile, true);
+
+		long fileSize = firstFile.length();
+		int iter = 1;
+		long remainingByte = fileSize;
+
+		byte[] buffer;
+		byte[] secretByte;
+		BigInteger secret_r;
+
+		if(remainingByte < LEN_BLOCK) {
+			buffer = new byte[(int) remainingByte];
+		}else {
+			buffer = new byte[LEN_BLOCK + 1];
+		}
+
+		while ((ios.read(buffer)) != -1) {
+			System.out.println(".");
+
+			informations.add(new Entrant(idsEntrance[0], new BigInteger(buffer))); // primo file
+
+			for(int j = 1; j < partialInfoFiles.length; j++) {
+				raf = new RandomAccessFile(partialInfoFiles[j], "r");
+				raf.seek((iter-1) * (LEN_BLOCK + 1));
+				raf.read(buffer);
+
+				informations.add(new Entrant(idsEntrance[j], new BigInteger(buffer)));
+			}
+
+			// compute and write secret
+			secret_r = secShar.computeSecret(informations);
+			
+			secretByte = secret_r.toByteArray();
+			fos.write(Arrays.copyOfRange(secretByte, 1, secretByte.length));
+
+			remainingByte = fileSize - (iter * (LEN_BLOCK + 1));
+			if(remainingByte < (LEN_BLOCK + 1) && remainingByte > 0) {
+				buffer = new byte[(int) remainingByte];
+			}		
+			informations.clear();
+			iter++;
+		}
+		fos.close();
+		ios.close();
 	}
 
 	private String byteArrayToHexString(byte[] arrayBytes) {
