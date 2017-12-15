@@ -13,7 +13,7 @@ import progetto4.SecureDistributedStorage;
 public class testStorage {
 	
 	final static String BASE_PATH = Paths.get(System.getProperty("user.dir")).toString();
-	final static String FILE_TO_TEST = "fileEx";
+	final static String FILE_TO_TEST = "testo.pdf";
 	final static String FILE_EX_PATH = BASE_PATH + "/data/" + FILE_TO_TEST;
 	final static String FILE_CLIENT_PATH = BASE_PATH + "/data/client/" + FILE_TO_TEST + ".sc";
 	
@@ -34,9 +34,10 @@ public class testStorage {
 		} catch (IOException | SecretSharingException | NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
-	*/	
+*/
 	
-		
+		/*
+		//ricostruzione con in primi k server disponibili
 		try {
 			secStor.load(FILE_CLIENT_PATH);
 			System.out.println();
@@ -44,6 +45,19 @@ public class testStorage {
 		} catch (IOException | DistribStorageException e) {
 			e.printStackTrace();
 		}
+		*/
+		
+	
+		//selezione dei server da utilizzare per la ricostruzione
+		try {
+			String[] idEntrance = {"1", "2", "5"};
+			secStor.load(FILE_CLIENT_PATH, idEntrance);
+			System.out.println();
+			System.out.println("File ricostruito");
+		} catch (IOException | DistribStorageException e) {
+			e.printStackTrace();
+		}
+		
 		
 	
 	}

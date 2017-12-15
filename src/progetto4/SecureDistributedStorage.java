@@ -76,13 +76,16 @@ public class SecureDistributedStorage {
 
 		byte[] buffer;
 		byte[] secretByte;
+		int blk_size;
 
 		if(remainingByte < LEN_BLOCK) {
 			buffer = new byte[(int) remainingByte];
-			secretByte = new byte[(int) (remainingByte + 1)];
+			blk_size = (int) (remainingByte + 1);
+			secretByte = new byte[blk_size];
 		}else {
 			buffer = new byte[LEN_BLOCK];
-			secretByte = new byte[LEN_BLOCK + 1];
+			blk_size = LEN_BLOCK + 1;
+			secretByte = new byte[blk_size];
 		}
 
 
@@ -95,30 +98,21 @@ public class SecureDistributedStorage {
 				secretByte[0] = 10;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
 				secret = new BigInteger(secretByte);
-				System.out.println(new String(secretByte, "UTF-8"));
-				System.out.println("BigInteger: " + secret);
 
 				secShar.setSecret(secret);
-
 				prime = secShar.generatePartialInformations(k, n, informations);
 				System.out.println("primo :" + prime);
 			}else {
 				secretByte[0] = 1;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
 				secret = new BigInteger(secretByte);
-				System.out.println(new String(secretByte, "UTF-8"));
-				System.out.println("BigInteger: " + secret);
 
 				secShar.setSecret(secret);
-
 				secShar.generatePartialInformations(k, n, prime, informations);
 			}
 
-			System.out.println();
-			
 			// write partial information to storage servers
-			//System.out.println(informations);
-			storeToServers(informations, fileNameList, serverList);
+			storeToServers(informations, fileNameList, serverList, blk_size);
 
 			// write local informationto client
 			storeClient(fileToStore, k, prime, fileNameList, serverList);
@@ -126,7 +120,8 @@ public class SecureDistributedStorage {
 			remainingByte = fileSize - (iter * LEN_BLOCK);
 			if(remainingByte < LEN_BLOCK && remainingByte > 0) {
 				buffer = new byte[(int) remainingByte];
-				secretByte = new byte[(int) (remainingByte + 1)];
+				blk_size = (int) (remainingByte + 1);
+				secretByte = new byte[blk_size];
 			}			
 			iter++;
 		}
@@ -134,13 +129,14 @@ public class SecureDistributedStorage {
 	}
 
 	/**
-	 * Il metodo scrive le informazioni parziali nei server nell'ordine in cui sono presenti nella lista serverList
-	 * @param partialInformations
-	 * @param serverList
-	 * @throws IOException 
-	 * @throws DistribStorageException 
+	 * Il metodo ricostruisce il file di partenza partendo dalle informazioni presenti nel file passato come parametro.
+	 * Il file passato come parametro è il file contenente le informazioni in possesso da parte del client.
+	 * Il metodo utilizza i primi k server disponibili per poter ottenere le informazioni utili alla ricostruzione
+	 * Il file ricostruito verrà scritto all'interno della cartella del client, nella sottocartella "recFiles", con il nome uguale al nome del file originale
+	 * @param fileToLoad_path
+	 * @throws IOException
+	 * @throws DistribStorageException
 	 */
-
 	public void load(String fileToLoad_path) throws IOException, DistribStorageException {
 		File fileToLoad = new File(fileToLoad_path);
 
@@ -184,7 +180,80 @@ public class SecureDistributedStorage {
 
 	}
 
-	private void storeToServers(ArrayList<Entrant> partialInformations, ArrayList<String> filesName, ArrayList<String> serverList) throws IOException {
+	/**
+	 * Il metodo ricostruisce il file di partenza partendo dalle informazioni presenti nel file passato come parametro fileToLoad_path.
+	 * Il file passato come parametro è il file contenente le informazioni in possesso da parte del client.
+	 * Il metodo utilizza i k server identificati dagli id presenti nel array passato come parametro idsEntrance.
+	 * Se l'array idsEntrance non contiene k identificativi, o se uno dei file presenti non esiste, il metodo lancia un'eccezione del tipo DistribStorageException.
+	 * Il file ricostruito verrà scritto all'interno della cartella del client, nella sottocartella "recFiles", con il nome uguale al nome del file originale
+	 * @param fileToLoad_path
+	 * @param idsEntrance
+	 * @throws IOException
+	 * @throws DistribStorageException
+	 */
+	public void load(String fileToLoad_path, String[] idsEntrance) throws IOException, DistribStorageException {
+		File fileToLoad = new File(fileToLoad_path);
+
+		// leggere le informazioni dal file
+		BigInteger prime;
+		int k;
+		ArrayList<String> serverList = new ArrayList<String>();
+		ArrayList<String> filesList = new ArrayList<String>();
+		String hashOriginalFile;
+
+		BufferedReader breader = new BufferedReader(new FileReader(fileToLoad));
+
+		prime = new BigInteger(breader.readLine());
+		k = Integer.parseInt(breader.readLine());
+
+		String serverListString = breader.readLine();
+		serverListString = serverListString.substring(1, serverListString.length()-1);
+		for(String server: serverListString.split(", ")) {
+			serverList.add(server);
+		}
+
+		String filesListString = breader.readLine();
+		filesListString = filesListString.substring(1, filesListString.length()-1);
+		for(String file: filesListString.split(", ")) {
+			filesList.add(file);
+		}
+
+		hashOriginalFile = breader.readLine();		
+
+		breader.close();		
+
+		// ottenere le k informazioni dai server
+		// consiedriamo le k informazioni legate ai server con id presenti nel parametro idsEntrance
+		if(idsEntrance.length != k)
+			throw new DistribStorageException("Sono necessari k server! idsEntrance conteine ne contiene soltanto" + idsEntrance.length);
+		
+		File[] partialInfoFiles = new File[k];
+		
+		String pathFile;
+		File testFile;
+		
+		for(int i = 0; i < k; i++) {
+			pathFile = SERVERS_PATH + serverList.get(Integer.parseInt(idsEntrance[i])-1) + File.separator + filesList.get(Integer.parseInt(idsEntrance[i])-1);
+			testFile = new File(pathFile);
+			
+			if(!testFile.exists()) 
+				throw new DistribStorageException("File inesistente: " + pathFile);
+				
+			partialInfoFiles[i] = testFile;
+		}
+
+		secShar.setPrime(prime);
+		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles);
+	}
+	
+	/**
+	 * Il metodo scrive le informazioni parziali nei server nell'ordine in cui sono presenti nella lista serverList
+	 * @param partialInformations
+	 * @param serverList
+	 * @throws IOException 
+	 * @throws DistribStorageException 
+	 */
+	private void storeToServers(ArrayList<Entrant> partialInformations, ArrayList<String> filesName, ArrayList<String> serverList, int blk_size) throws IOException {		
 		int i = 0;
 		byte[] byteSecret;
 		FileOutputStream out = null;
@@ -196,6 +265,18 @@ public class SecureDistributedStorage {
 			}
 
 			byteSecret = e.getS_i().toByteArray();
+			if(byteSecret.length < blk_size) {
+				// controllare se il blocco da scrivere è della dimensione corretta
+				// in caso negativo, zero-padding in testa all'array di byte da scrivere
+				byte[] tmpSecret = new byte[blk_size];
+				
+				int j;
+				for(j = 0; j < (blk_size - byteSecret.length); j++ ) {
+					tmpSecret[j] = 0;
+				}
+				System.arraycopy(byteSecret, 0, tmpSecret, j, byteSecret.length);
+				byteSecret = tmpSecret;
+			}	
 
 			out = new FileOutputStream(SERVERS_PATH + serverList.get(i) + "/" + filesName.get(i), true);
 			out.write(byteSecret);
@@ -204,6 +285,7 @@ public class SecureDistributedStorage {
 			i++;
 		}
 		out.close();
+		
 	}
 
 	/**
@@ -337,24 +419,22 @@ public class SecureDistributedStorage {
 		}
 
 		while ((ios.read(buffer)) != -1) {
-			System.out.println("...");
-
+			System.out.println((iter-1) * LEN_BLOCK * 100 / fileSize + " %");
 			informations.add(new Entrant(idsEntrance[0], new BigInteger(buffer))); // primo file
 
 			for(int j = 1; j < partialInfoFiles.length; j++) {
 				raf = new RandomAccessFile(partialInfoFiles[j], "r");
 				raf.seek((iter-1) * (LEN_BLOCK + 1));
 				raf.read(buffer);
+				raf.close();
 
 				informations.add(new Entrant(idsEntrance[j], new BigInteger(buffer)));
 			}
 
 			// compute and write secret
 			secret_r = secShar.computeSecret(informations);
-			System.out.println("Secret Big: " + secret_r);
 			
 			secretByte = secret_r.toByteArray();
-			System.out.println(new String(secretByte));
 			fos.write(Arrays.copyOfRange(secretByte, 1, secretByte.length));
 
 			remainingByte = fileSize - (iter * (LEN_BLOCK + 1));
