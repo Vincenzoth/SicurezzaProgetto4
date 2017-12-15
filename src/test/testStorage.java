@@ -28,13 +28,13 @@ public class testStorage {
 		serverList.add("server4");
 		serverList.add("server5");
 		
-
+/*
 		try {
 			secStor.store(file, 3, 5, serverList);
 		} catch (IOException | SecretSharingException | NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
-		
+	*/	
 	
 		
 		try {
