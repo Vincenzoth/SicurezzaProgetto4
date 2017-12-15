@@ -3,7 +3,6 @@ package progetto4;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -27,7 +26,7 @@ public class SecureDistributedStorage {
 	public static final String CLIENT_PATH = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator;
 	public static final String CLIENT_PATH_REC_FILE = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator + "recFiles" + File.separator;
 
-	public static final int LEN_BLOCK = 300;
+	public static final int LEN_BLOCK = 500;
 	public static final int RANDOM_NAMEFILE_LEN = 15;
 	public static final String HASH_ALG = "SHA-256";
 
@@ -88,25 +87,26 @@ public class SecureDistributedStorage {
 
 
 		while ((ios.read(buffer)) != -1) {
-			System.out.println("----Iter ----");
-			System.out.println("Len: " + buffer.length);
+			System.out.println((iter-1) * LEN_BLOCK * 100 / fileSize + " %");
 
 			// la prima volta viene generato il primo, per gli altri blocchi si utilizza sempre lo stesso primo
 			if(prime == null) {
+				System.out.println("    ---  Generazione del primo in corso...");
 				secretByte[0] = 10;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
 				secret = new BigInteger(secretByte);
-				System.out.println(Arrays.toString(secretByte));
+				System.out.println(new String(secretByte, "UTF-8"));
 				System.out.println("BigInteger: " + secret);
 
 				secShar.setSecret(secret);
 
 				prime = secShar.generatePartialInformations(k, n, informations);
+				System.out.println("primo :" + prime);
 			}else {
 				secretByte[0] = 1;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
 				secret = new BigInteger(secretByte);
-				System.out.println(Arrays.toString(secretByte));
+				System.out.println(new String(secretByte, "UTF-8"));
 				System.out.println("BigInteger: " + secret);
 
 				secShar.setSecret(secret);
@@ -114,11 +114,11 @@ public class SecureDistributedStorage {
 				secShar.generatePartialInformations(k, n, prime, informations);
 			}
 
-			// write partial information to storage servers
-			System.out.println(informations);
-			storeToServers(informations, fileNameList, serverList);
-
 			System.out.println();
+			
+			// write partial information to storage servers
+			//System.out.println(informations);
+			storeToServers(informations, fileNameList, serverList);
 
 			// write local informationto client
 			storeClient(fileToStore, k, prime, fileNameList, serverList);
@@ -172,7 +172,6 @@ public class SecureDistributedStorage {
 
 		breader.close();		
 
-
 		// ottenere le k informazioni dai server
 		// consiedriamo le prime k informazioni reperibili
 		File[] partialInfoFiles = new File[k];
@@ -182,8 +181,6 @@ public class SecureDistributedStorage {
 
 		secShar.setPrime(prime);
 		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles);
-
-		//secShar.computeSecret(partialInformations)
 
 	}
 
@@ -316,7 +313,7 @@ public class SecureDistributedStorage {
 
 	private void obtainOriginalFile(String resultFileName, String[] idsEntrance, File[] partialInfoFiles) throws IOException {
 		ArrayList<Entrant> informations = new ArrayList<Entrant>();
-		File secretFile = new File(CLIENT_PATH_REC_FILE + resultFileName +"a");
+		File secretFile = new File(CLIENT_PATH_REC_FILE + resultFileName);
 		if(secretFile.exists())
 			secretFile.delete();
 		File firstFile = partialInfoFiles[0];
@@ -340,7 +337,7 @@ public class SecureDistributedStorage {
 		}
 
 		while ((ios.read(buffer)) != -1) {
-			System.out.println(".");
+			System.out.println("...");
 
 			informations.add(new Entrant(idsEntrance[0], new BigInteger(buffer))); // primo file
 
@@ -354,8 +351,10 @@ public class SecureDistributedStorage {
 
 			// compute and write secret
 			secret_r = secShar.computeSecret(informations);
+			System.out.println("Secret Big: " + secret_r);
 			
 			secretByte = secret_r.toByteArray();
+			System.out.println(new String(secretByte));
 			fos.write(Arrays.copyOfRange(secretByte, 1, secretByte.length));
 
 			remainingByte = fileSize - (iter * (LEN_BLOCK + 1));

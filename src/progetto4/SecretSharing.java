@@ -67,24 +67,24 @@ public class SecretSharing {
 	 * Il metodo genera le informazioni parziali per lo schema di Shamir.
 	 * @param k  -  parametro k dello schema di Shamir, è il numero minimo di informazioni per poter ricostruire il segreto
 	 * @param n  -  parametro n dello schema di Shamir, è il numero di informaizni parziali che verranno generate
-	 * @param p  -  primo di rifrimento dello schema di Shamir
+	 * @param prime  -  primo di rifrimento dello schema di Shamir
 	 * @param partialInformations  -  array nel quale verranno memorizzate le informazioni parziali generate
 	 * @throws SecretSharingException 
 	 */
-	public void generatePartialInformations(int k, int n, BigInteger p, ArrayList<Entrant> partialInformations) throws SecretSharingException{
+	public void generatePartialInformations(int k, int n, BigInteger prime, ArrayList<Entrant> partialInformations) throws SecretSharingException{
 		if(s.equals(null)) 
 			throw new SecretSharingException("Segreto non impostato!");
-		if(s.compareTo(p) >= 0)
+		if(s.compareTo(prime) >= 0)
 			throw new SecretSharingException("Il primo p non è più grande del segreto s!");
-		if(BigInteger.valueOf(n).compareTo(p) >= 0)
+		if(BigInteger.valueOf(n).compareTo(prime) >= 0)
 			throw new SecretSharingException("Il primo p non è più grande di n!");
-		if(!p.isProbablePrime(this.CERTAINTY))
+		if(!prime.isProbablePrime(this.CERTAINTY))
 			throw new SecretSharingException("p non è primo!");
 		
 		if(!partialInformations.isEmpty())
 			partialInformations.clear();
 		
-		this.p = p;
+		this.p = prime;
 		
 		generatePartialInformations_base(k, n, partialInformations);
 		
