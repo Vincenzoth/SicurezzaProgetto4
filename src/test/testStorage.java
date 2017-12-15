@@ -11,6 +11,7 @@ import progetto4.SecretSharingException;
 import progetto4.SecureDistributedStorage;
 
 public class testStorage {
+	
 	final static String BASE_PATH = Paths.get(System.getProperty("user.dir")).toString();
 	final static String FILE_TO_TEST = "fileEx";
 	final static String FILE_EX_PATH = BASE_PATH + "/data/" + FILE_TO_TEST;
