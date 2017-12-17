@@ -12,12 +12,15 @@ import java.io.RandomAccessFile;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Locale;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 public class SecureDistributedStorage {
 	public static final String BASE_PATH = Paths.get(System.getProperty("user.dir")).toString();
@@ -59,8 +62,9 @@ public class SecureDistributedStorage {
 	 * @throws IOException
 	 * @throws SecretSharingException
 	 * @throws NoSuchAlgorithmException
+	 * @throws InvalidKeyException 
 	 */
-	public void store(File fileToStore, int k, int n, ArrayList<String> serverList) throws IOException, SecretSharingException, NoSuchAlgorithmException {
+	public void store(File fileToStore, int k, int n, ArrayList<String> serverList, String macAlg, String macKey) throws IOException, SecretSharingException, NoSuchAlgorithmException, InvalidKeyException {
 		ArrayList<Entrant> informations = new ArrayList<Entrant>();
 		InputStream ios = null;
 
@@ -115,7 +119,7 @@ public class SecureDistributedStorage {
 			storeToServers(informations, fileNameList, serverList, blk_size);
 
 			// write local informationto client
-			storeClient(fileToStore, k, prime, fileNameList, serverList);
+			storeClient(fileToStore, k, prime, fileNameList, serverList, macAlg, macKey);
 
 			remainingByte = fileSize - (iter * LEN_BLOCK);
 			if(remainingByte < LEN_BLOCK && remainingByte > 0) {
@@ -136,8 +140,11 @@ public class SecureDistributedStorage {
 	 * @param fileToLoad_path
 	 * @throws IOException
 	 * @throws DistribStorageException
+	 * @throws NoSuchAlgorithmException 
+	 * @throws IllegalStateException 
+	 * @throws InvalidKeyException 
 	 */
-	public void load(String fileToLoad_path) throws IOException, DistribStorageException {
+	public void load(String fileToLoad_path, String macKey, String macAlg) throws IOException, DistribStorageException, InvalidKeyException, IllegalStateException, NoSuchAlgorithmException {
 		File fileToLoad = new File(fileToLoad_path);
 
 		// leggere le informazioni dal file
@@ -145,7 +152,7 @@ public class SecureDistributedStorage {
 		int k;
 		ArrayList<String> serverList = new ArrayList<String>();
 		ArrayList<String> filesList = new ArrayList<String>();
-		String hashOriginalFile;
+		String hmacOriginalFile;
 
 		BufferedReader breader = new BufferedReader(new FileReader(fileToLoad));
 
@@ -164,7 +171,7 @@ public class SecureDistributedStorage {
 			filesList.add(file);
 		}
 
-		hashOriginalFile = breader.readLine();		
+		hmacOriginalFile = breader.readLine();		
 
 		breader.close();		
 
@@ -176,8 +183,7 @@ public class SecureDistributedStorage {
 		getPartialInformationFiles(k, serverList, filesList, partialInfoFiles, idsEntrance);
 
 		secShar.setPrime(prime);
-		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles);
-
+		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles, macKey, macAlg, hmacOriginalFile);
 	}
 
 	/**
@@ -190,8 +196,11 @@ public class SecureDistributedStorage {
 	 * @param idsEntrance
 	 * @throws IOException
 	 * @throws DistribStorageException
+	 * @throws NoSuchAlgorithmException 
+	 * @throws IllegalStateException 
+	 * @throws InvalidKeyException 
 	 */
-	public void load(String fileToLoad_path, String[] idsEntrance) throws IOException, DistribStorageException {
+	public void load(String fileToLoad_path, String[] idsEntrance, String macKey, String macAlg) throws IOException, DistribStorageException, InvalidKeyException, IllegalStateException, NoSuchAlgorithmException {
 		File fileToLoad = new File(fileToLoad_path);
 
 		// leggere le informazioni dal file
@@ -199,7 +208,7 @@ public class SecureDistributedStorage {
 		int k;
 		ArrayList<String> serverList = new ArrayList<String>();
 		ArrayList<String> filesList = new ArrayList<String>();
-		String hashOriginalFile;
+		String hmacOriginalFile;
 
 		BufferedReader breader = new BufferedReader(new FileReader(fileToLoad));
 
@@ -218,7 +227,7 @@ public class SecureDistributedStorage {
 			filesList.add(file);
 		}
 
-		hashOriginalFile = breader.readLine();		
+		hmacOriginalFile = breader.readLine();		
 
 		breader.close();		
 
@@ -226,26 +235,26 @@ public class SecureDistributedStorage {
 		// consiedriamo le k informazioni legate ai server con id presenti nel parametro idsEntrance
 		if(idsEntrance.length != k)
 			throw new DistribStorageException("Sono necessari k server! idsEntrance conteine ne contiene soltanto" + idsEntrance.length);
-		
+
 		File[] partialInfoFiles = new File[k];
-		
+
 		String pathFile;
 		File testFile;
-		
+
 		for(int i = 0; i < k; i++) {
 			pathFile = SERVERS_PATH + serverList.get(Integer.parseInt(idsEntrance[i])-1) + File.separator + filesList.get(Integer.parseInt(idsEntrance[i])-1);
 			testFile = new File(pathFile);
-			
+
 			if(!testFile.exists()) 
 				throw new DistribStorageException("File inesistente: " + pathFile);
-				
+
 			partialInfoFiles[i] = testFile;
 		}
 
 		secShar.setPrime(prime);
-		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles);
+		obtainOriginalFile(fileToLoad.getName().substring(0, fileToLoad.getName().length()-3), idsEntrance, partialInfoFiles, macKey, macAlg, hmacOriginalFile);
 	}
-	
+
 	/**
 	 * Il metodo scrive le informazioni parziali nei server nell'ordine in cui sono presenti nella lista serverList
 	 * @param partialInformations
@@ -269,7 +278,7 @@ public class SecureDistributedStorage {
 				// controllare se il blocco da scrivere è della dimensione corretta
 				// in caso negativo, zero-padding in testa all'array di byte da scrivere
 				byte[] tmpSecret = new byte[blk_size];
-				
+
 				int j;
 				for(j = 0; j < (blk_size - byteSecret.length); j++ ) {
 					tmpSecret[j] = 0;
@@ -285,7 +294,7 @@ public class SecureDistributedStorage {
 			i++;
 		}
 		out.close();
-		
+
 	}
 
 	/**
@@ -343,20 +352,17 @@ public class SecureDistributedStorage {
 	 * @param serverList
 	 * @throws IOException 
 	 * @throws NoSuchAlgorithmException 
+	 * @throws InvalidKeyException 
 	 */
-	private void storeClient(File fileToStore, int k, BigInteger prime, ArrayList<String> fileNameList, ArrayList<String> serverList) throws IOException, NoSuchAlgorithmException {		
-		MessageDigest md = MessageDigest.getInstance(HASH_ALG);
-		byte[] inputBytes = Files.readAllBytes(Paths.get(fileToStore.getPath()));
-		md.update(inputBytes);
-		byte[] hashedBytes = md.digest();
-
+	private void storeClient(File fileToStore, int k, BigInteger prime, ArrayList<String> fileNameList, ArrayList<String> serverList, String macAlg, String key) throws IOException, NoSuchAlgorithmException, InvalidKeyException {		
+		
 		PrintWriter writer =  new PrintWriter(CLIENT_PATH + fileToStore.getName() + ".sc");
 
 		writer.println(prime);
 		writer.println(k);
 		writer.println(serverList);
 		writer.println(fileNameList);
-		writer.println(byteArrayToHexString(hashedBytes));
+		writer.println(calculateHmac(fileToStore, key, macAlg));
 
 		writer.close();		
 	}
@@ -393,7 +399,19 @@ public class SecureDistributedStorage {
 
 	}
 
-	private void obtainOriginalFile(String resultFileName, String[] idsEntrance, File[] partialInfoFiles) throws IOException {
+	/**
+	 * Il metodo ricostruisce il file originale a partire dai file contenenti le informazioni parziali.
+	 * il file ricostruito viene memorizzato all'interno della cartella "recFile" del client.
+	 * @param resultFileName
+	 * @param idsEntrance
+	 * @param partialInfoFiles
+	 * @throws IOException
+	 * @throws DistribStorageException 
+	 * @throws NoSuchAlgorithmException 
+	 * @throws IllegalStateException 
+	 * @throws InvalidKeyException 
+	 */
+	private void obtainOriginalFile(String resultFileName, String[] idsEntrance, File[] partialInfoFiles, String macKey, String macAlg, String macToEvaluate) throws IOException, InvalidKeyException, IllegalStateException, NoSuchAlgorithmException, DistribStorageException {
 		ArrayList<Entrant> informations = new ArrayList<Entrant>();
 		File secretFile = new File(CLIENT_PATH_REC_FILE + resultFileName);
 		if(secretFile.exists())
@@ -433,7 +451,7 @@ public class SecureDistributedStorage {
 
 			// compute and write secret
 			secret_r = secShar.computeSecret(informations);
-			
+
 			secretByte = secret_r.toByteArray();
 			fos.write(Arrays.copyOfRange(secretByte, 1, secretByte.length));
 
@@ -446,8 +464,43 @@ public class SecureDistributedStorage {
 		}
 		fos.close();
 		ios.close();
+		
+		evaluateMac(secretFile,macKey, macAlg, macToEvaluate);
 	}
 
+	/**
+	 * Il metodo calclola il valore HMAC del file passato come parametro
+	 * @param file    - file di cui calcolare il valore MAC
+	 * @param key     - chiave per la gemerazione del valore HMAC 
+	 * @param macAlg  - tipo di algoritmo HASH da utilizzare
+	 * @return  - la stringa del valore HMAC rappresentata in valori esadecimali
+	 * @throws InvalidKeyException
+	 * @throws IllegalStateException
+	 * @throws IOException
+	 * @throws NoSuchAlgorithmException
+	 */
+	private String calculateHmac(File file, String key, String macAlg) throws InvalidKeyException, IllegalStateException, IOException, NoSuchAlgorithmException {
+		SecretKeySpec key_s = new SecretKeySpec((key).getBytes("UTF-8"), macAlg);
+		Mac mac = Mac.getInstance(macAlg);
+		mac.init(key_s);
+
+		byte[] hmacBytes = mac.doFinal(Files.readAllBytes(Paths.get(file.getPath())));
+		
+		return byteArrayToHexString(hmacBytes);
+	}
+	
+	private void evaluateMac(File secretFile, String macKey, String macAlg, String macToEvaluate) throws InvalidKeyException, IllegalStateException, NoSuchAlgorithmException, IOException, DistribStorageException {
+		String mac = calculateHmac(secretFile, macKey, macAlg);
+		
+		if(!mac.equals(macToEvaluate))
+			throw new DistribStorageException("Il file non è integro! Controllo MAC fallito.");
+	}
+	
+	/**
+	 * Il metodo converte in un array di byte in una stringa di valori esadecimali
+	 * @param arrayBytes array di byte da convertire
+	 * @return stringa di valori esadecimali
+	 */
 	private String byteArrayToHexString(byte[] arrayBytes) {
 		StringBuffer stringBuffer = new StringBuffer();
 		for (int i = 0; i < arrayBytes.length; i++) {
@@ -455,16 +508,6 @@ public class SecureDistributedStorage {
 					.substring(1));
 		}
 		return stringBuffer.toString();
-	}
-
-	private byte[] hexStringToByteArray(String s) {
-		int len = s.length();
-		byte[] data = new byte[len / 2];
-		for (int i = 0; i < len; i += 2) {
-			data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-					+ Character.digit(s.charAt(i+1), 16));
-		}
-		return data;
 	}
 
 }

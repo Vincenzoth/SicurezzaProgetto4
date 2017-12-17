@@ -72,6 +72,8 @@ public class SecretSharing {
 	 * @throws SecretSharingException 
 	 */
 	public void generatePartialInformations(int k, int n, BigInteger prime, ArrayList<Entrant> partialInformations) throws SecretSharingException{
+		if(k > n)
+			throw new SecretSharingException("k deve essere minore o al più ugale a n!");
 		if(s.equals(null)) 
 			throw new SecretSharingException("Segreto non impostato!");
 		if(s.compareTo(prime) >= 0)
@@ -96,8 +98,12 @@ public class SecretSharing {
 	 * @param n  -  parametro n dello schema di Shamir, è il numero di informaizni parziali che verranno generate
 	 * @param p  -  primo di rifrimento dello schema di Shamir
 	 * @param partialInformations  -  array nel quale verranno memorizzate le informazioni parziali generate
+	 * @throws SecretSharingException 
 	 */
-	private void generatePartialInformations_base(int k, int n, ArrayList<Entrant> partialInformations) {
+	private void generatePartialInformations_base(int k, int n, ArrayList<Entrant> partialInformations) throws SecretSharingException {
+		if(k > n)
+			throw new SecretSharingException("k deve essere minore o al più ugale a n!");
+		
 		BigInteger[] coeffs = new BigInteger[k-1]; // array dei coefficienti del polinomio di grado k-1
 
 		// definizione del polinomio
