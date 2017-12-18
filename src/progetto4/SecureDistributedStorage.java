@@ -31,7 +31,6 @@ public class SecureDistributedStorage {
 
 	public static final int LEN_BLOCK = 500;
 	public static final int RANDOM_NAMEFILE_LEN = 15;
-	public static final String HASH_ALG = "SHA-256";
 
 	private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	private static final String LOWER = UPPER.toLowerCase(Locale.ROOT);
@@ -39,9 +38,14 @@ public class SecureDistributedStorage {
 	private static final String ALPHANUM = UPPER + LOWER + DIGITS;
 
 	private SecretSharing secShar;
+	private boolean verbose;
 
+	/**
+	 * Cosatruttore della classe
+	 */
 	public SecureDistributedStorage() {
 		secShar = new SecretSharing();
+		this.verbose = false;
 
 		File testPath = new File(SERVERS_PATH);
 		if(!testPath.exists())		 
@@ -50,6 +54,16 @@ public class SecureDistributedStorage {
 		testPath = new File(CLIENT_PATH_REC_FILE);
 		if(!testPath.exists())		 
 			testPath.mkdirs();
+	}
+	
+	/**
+	 * Costruttore della classe
+	 * @param verbose  -  abilita la scrittura dello stato sullo standard output
+	 */
+	public SecureDistributedStorage(boolean verbose) {
+		this();
+		
+		this.verbose = verbose;		
 	}
 
 	/**
@@ -94,18 +108,21 @@ public class SecureDistributedStorage {
 
 
 		while ((ios.read(buffer)) != -1) {
-			System.out.println((iter-1) * LEN_BLOCK * 100 / fileSize + " %");
+			if(verbose)
+				System.out.println((iter-1) * LEN_BLOCK * 100 / fileSize + " %");
 
 			// la prima volta viene generato il primo, per gli altri blocchi si utilizza sempre lo stesso primo
 			if(prime == null) {
-				System.out.println("    ---  Generazione del primo in corso...");
+				if(verbose)
+					System.out.println("    ---  Generazione del primo in corso...");
 				secretByte[0] = 10;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
 				secret = new BigInteger(secretByte);
 
 				secShar.setSecret(secret);
 				prime = secShar.generatePartialInformations(k, n, informations);
-				System.out.println("primo :" + prime);
+				if(verbose)
+					System.out.println("primo :" + prime);
 			}else {
 				secretByte[0] = 1;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
@@ -437,7 +454,8 @@ public class SecureDistributedStorage {
 		}
 
 		while ((ios.read(buffer)) != -1) {
-			System.out.println((iter-1) * LEN_BLOCK * 100 / fileSize + " %");
+			if(verbose)
+				System.out.println((iter-1) * LEN_BLOCK * 100 / fileSize + " %");
 			informations.add(new Entrant(idsEntrance[0], new BigInteger(buffer))); // primo file
 
 			for(int j = 1; j < partialInfoFiles.length; j++) {

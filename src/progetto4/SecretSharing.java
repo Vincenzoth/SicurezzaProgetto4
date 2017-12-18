@@ -12,7 +12,6 @@ public class SecretSharing {
 	private BigInteger p;
 
 	public SecretSharing() {
-		//this.modLength = modLength; // calcolala dinamicamente
 		this.s = null;
 	}
 

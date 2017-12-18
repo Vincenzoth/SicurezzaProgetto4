@@ -23,7 +23,7 @@ public class testStorage {
 
 	public static void main(String[] args) {
 		String macKey = "chiaveDelMac";
-		SecureDistributedStorage secStor = new SecureDistributedStorage();
+		SecureDistributedStorage secStor = new SecureDistributedStorage(true);
 
 		File file = new File(FILE_EX_PATH);
 		ArrayList<String> serverList = new ArrayList<String>();
@@ -37,6 +37,7 @@ public class testStorage {
 		try {
 			System.out.println(" ----- Generazione informazioni parziali ------------------------------ ");
 			secStor.store(file, 3, 5, serverList, MAC_ALG, macKey);
+			System.out.println("\nFile parziali memorizzati sui server");
 		} catch (IOException | SecretSharingException | NoSuchAlgorithmException | InvalidKeyException e) {
 			e.printStackTrace();
 		}
