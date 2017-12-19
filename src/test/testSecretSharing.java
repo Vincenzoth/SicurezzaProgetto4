@@ -9,8 +9,8 @@ import progetto4.*;
 public class testSecretSharing {
 
 	public static void main(String[] args) {
-		int k = 38;
-		int n= 56;
+		int k = 85;
+		int n= 100;
 
 		SecretSharing ss = new SecretSharing();
 		
@@ -28,8 +28,8 @@ public class testSecretSharing {
 			p = ss.generatePartialInformations(k, n, informations);
 			
 			// ...oppure possiamo decidere di utilizzare un primo a scelta
-			//p = new BigInteger("368825414839026694656526417537712528639136378032700719406517620121630789757");
-			//ss.generatePartialInformations(k, n, p,  informations);
+			p = new BigInteger("368825414839026694656526417537712528639136378032700719406517620121630789757");
+			ss.generatePartialInformations(k, n, p,  informations);
 
 			System.out.println("Informazioni parziali generate...");
 			System.out.println("Il primo generato è: " + p);

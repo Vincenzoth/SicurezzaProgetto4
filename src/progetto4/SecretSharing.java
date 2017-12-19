@@ -3,7 +3,10 @@ package progetto4;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Random;
-
+/**
+ * La classe implementa lo schema a soglia (k,n) di Shamir.
+ *
+ */
 public class SecretSharing {
 	private final int CERTAINTY = 50;
 
@@ -11,6 +14,9 @@ public class SecretSharing {
 	private int modLength;
 	private BigInteger p;
 
+	/**
+	 * Costruttore della classe
+	 */
 	public SecretSharing() {
 		this.s = null;
 	}
@@ -124,10 +130,10 @@ public class SecretSharing {
 	}
 
 	/**
-	 * Il metodo ricostruisece e restituisce il segreto a partire dalla lista di informazioni parziali passata come parametro. 
-	 * Utilizza l'intrpolazione di Lagrange per ricostruire il polinomio e valutare il segreto.
+	 * Il metodo ricostruisce  e restituisce il segreto a partire dalla lista di informazioni parziali passata come parametro. 
+	 * Utilizza la formula di intrpolazione di Lagrange per ricostruire il polinomio e valutare il segreto.
 	 * @param partialInformations
-	 * @return
+	 * @return  - il segreto ricostruito
 	 */
 	public BigInteger computeSecret(ArrayList<Entrant> partialInformations) {
 		BigInteger secret = BigInteger.ZERO;

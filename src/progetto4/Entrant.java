@@ -1,7 +1,10 @@
 package progetto4;
 
 import java.math.BigInteger;
-
+/**
+ * La classe rappresenta un partecipante nello schema di Shamir
+ *
+ */
 public class Entrant {
 
 	private BigInteger id;

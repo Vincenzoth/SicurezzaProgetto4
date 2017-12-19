@@ -3,6 +3,7 @@ package progetto4;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -15,28 +16,39 @@ import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Locale;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * La classe implementa il servizio di Secure Distributed Storage.
+ * Pewrmette di dividere un generico file in n file di share differenti, ognuno di quali da solo
+ * privo di alcuna informazione riguardante il file di partenza.
+ * Elaborando un numero di file di share k, sarà possibile ricostruire il file originario
+ * senza alcuna perdita di informazione.
+ *
+ */
 public class SecureDistributedStorage {
 	public static final String BASE_PATH = Paths.get(System.getProperty("user.dir")).toString();
 	public static final String FILE_EX_PATH = BASE_PATH + File.separator + "data" + File.separator+ "fileEx";
 	public static final String SERVERS_PATH = BASE_PATH + File.separator + "data" + File.separator + "servers" + File.separator;
 	public static final String CLIENT_PATH = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator;
 	public static final String CLIENT_PATH_REC_FILE = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator + "recFiles" + File.separator;
+	public static final String CLIENT_PATH_KEYS = BASE_PATH + File.separator + "data" + File.separator + "client" + File.separator + "keys" + File.separator;
 
-	public static final int LEN_BLOCK = 500;
+	public static final int LEN_BLOCK = 100;
 	public static final int RANDOM_NAMEFILE_LEN = 15;
 
 	private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	private static final String LOWER = UPPER.toLowerCase(Locale.ROOT);
 	private static final String DIGITS = "0123456789";
 	private static final String ALPHANUM = UPPER + LOWER + DIGITS;
-
+	
 	private SecretSharing secShar;
 	private boolean verbose;
 
@@ -81,7 +93,10 @@ public class SecureDistributedStorage {
 	public void store(File fileToStore, int k, int n, ArrayList<String> serverList, String macAlg, String macKey) throws IOException, SecretSharingException, NoSuchAlgorithmException, InvalidKeyException {
 		ArrayList<Entrant> informations = new ArrayList<Entrant>();
 		InputStream ios = null;
-
+		long start = 0;
+		if(verbose)
+			start = System.currentTimeMillis();
+		
 		// array ordinato dei nomi dei file che verranno generati
 		ArrayList<String> fileNameList = generateFilesName(serverList);
 
@@ -121,8 +136,10 @@ public class SecureDistributedStorage {
 
 				secShar.setSecret(secret);
 				prime = secShar.generatePartialInformations(k, n, informations);
-				if(verbose)
+				if(verbose) {
 					System.out.println("primo :" + prime);
+					System.out.println("Tempo mills generazione primo: " + (System.currentTimeMillis()-start));
+				}
 			}else {
 				secretByte[0] = 1;
 				System.arraycopy(buffer, 0, secretByte, 1, buffer.length);
@@ -146,11 +163,13 @@ public class SecureDistributedStorage {
 			}			
 			iter++;
 		}
+		if(verbose)
+			System.out.println("Tempo totale in mills: " + (System.currentTimeMillis()-start));
 		ios.close();
 	}
 
 	/**
-	 * Il metodo ricostruisce il file di partenza partendo dalle informazioni presenti nel file passato come parametro.
+	 * Il metodo ricostruisce il file di partenza dalle informazioni presenti nel file passato come parametro.
 	 * Il file passato come parametro è il file contenente le informazioni in possesso da parte del client.
 	 * Il metodo utilizza i primi k server disponibili per poter ottenere le informazioni utili alla ricostruzione
 	 * Il file ricostruito verrà scritto all'interno della cartella del client, nella sottocartella "recFiles", con il nome uguale al nome del file originale
@@ -334,21 +353,6 @@ public class SecureDistributedStorage {
 	}
 
 	/**
-	 * Genera e restituisce una stringa a caso di lunghezza RANDOM_NAMEFILE_LEN
-	 * @return la stringagenerata a casa
-	 */
-	private String randomName() {
-		char[] symbols = ALPHANUM.toCharArray();
-		SecureRandom random = new SecureRandom();
-		char[] buf = new char[RANDOM_NAMEFILE_LEN];
-
-		for (int i = 0; i < buf.length; ++i)
-			buf[i] = symbols[random.nextInt(symbols.length)];
-
-		return new String(buf);
-	}
-
-	/**
 	 * Il metodo verifica se nel server è gia presente un file con nome nameFile
 	 * @param nameFile  - nome file da testare
 	 * @param server    - nome server
@@ -359,6 +363,53 @@ public class SecureDistributedStorage {
 
 		return file.exists() ? false:true;
 	}
+	
+	/**
+	 * Genera e restituisce una stringa a caso di lunghezza RANDOM_NAMEFILE_LEN
+	 * @return la stringagenerata a casa
+	 */
+	private String randomName() {
+		return this.ranString(RANDOM_NAMEFILE_LEN);
+	}
+	
+	/**
+	 * Il metodo genera una chiave utile a calcolare il MAC del file. La chiave sotto forma di stringa viene memorizzata 
+	 * all’interno di un file nella cartella del client denominata “keys/” e restituita.
+	 * @param KeyLength
+	 * @return
+	 * @throws FileNotFoundException 
+	 */
+	public String genKey(int KeyLength) throws FileNotFoundException {
+		File testPath = new File(CLIENT_PATH_KEYS);
+		if(!testPath.exists())		 
+			testPath.mkdirs();
+		
+		String key = ranString(KeyLength);
+		String nameFile = "key_" + new SimpleDateFormat("dd-MM-yyyy_HH_mm_ss_SSS").format(new Date());
+		
+		PrintWriter writer =  new PrintWriter(CLIENT_PATH_KEYS + nameFile);
+		writer.println(key);
+		writer.close();		
+		
+		return key;
+	}
+	
+	/**
+	 * Il metodo genera una stringa casuale di lettere maiuscole, lettere minuscole e cifre di lunghezza pari al parametro keyLength
+	 * @param KeyLength
+	 * @return
+	 */
+	private String ranString(int KeyLength ) {
+		char[] symbols = ALPHANUM.toCharArray();
+		SecureRandom random = new SecureRandom();
+		char[] buf = new char[KeyLength];
+
+		for (int i = 0; i < buf.length; ++i)
+			buf[i] = symbols[random.nextInt(symbols.length)];
+
+		return new String(buf);
+	}
+
 
 	/**
 	 * Il metodo genera le informazioni da conservare sul client
@@ -487,7 +538,7 @@ public class SecureDistributedStorage {
 	}
 
 	/**
-	 * Il metodo calclola il valore HMAC del file passato come parametro
+	 * Il metodo calcola  il valore HMAC del file passato come parametro
 	 * @param file    - file di cui calcolare il valore MAC
 	 * @param key     - chiave per la gemerazione del valore HMAC 
 	 * @param macAlg  - tipo di algoritmo HASH da utilizzare
@@ -507,6 +558,19 @@ public class SecureDistributedStorage {
 		return byteArrayToHexString(hmacBytes);
 	}
 	
+	/**
+	 * Il metodo valuta se il MAC passato come parametro macToEvaluate è compatibile col mac del file passato come parametro secretFile 
+	 * 
+	 * @param secretFile
+	 * @param macKey
+	 * @param macAlg
+	 * @param macToEvaluate
+	 * @throws InvalidKeyException
+	 * @throws IllegalStateException
+	 * @throws NoSuchAlgorithmException
+	 * @throws IOException
+	 * @throws DistribStorageException
+	 */
 	private void evaluateMac(File secretFile, String macKey, String macAlg, String macToEvaluate) throws InvalidKeyException, IllegalStateException, NoSuchAlgorithmException, IOException, DistribStorageException {
 		String mac = calculateHmac(secretFile, macKey, macAlg);
 		
@@ -527,5 +591,7 @@ public class SecureDistributedStorage {
 		}
 		return stringBuffer.toString();
 	}
+	
+
 
 }
